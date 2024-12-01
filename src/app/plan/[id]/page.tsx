@@ -45,14 +45,12 @@ export default function GameScreen() {
 
   useEffect(() => {
     if (!params.id|| !userName || joined) return
-    console.log("osman");
 
     const socket = io(process.env.NEXT_PUBLIC_API_URL)
     setSocket(socket)
     
 
     socket.on('connect', () => {
-      console.log("osman2");
       socket.emit('joinRoom', {
         roomId: params.id,
         userName:userName,
@@ -61,7 +59,6 @@ export default function GameScreen() {
       setJoined(true)
     })
 
-    // Oda güncellemelerini dinle
     socket.on('roomUpdate', (data) => {
       console.log('Room update:', data)
       setGameState({
@@ -116,22 +113,32 @@ export default function GameScreen() {
         <CardHeader>
           {teamName && (
             <div className="flex justify-between items-center text-sm text-muted-foreground mb-2">
-              <div>Team: {teamName}</div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={copyInviteLink}
-                className="h-8 w-8"
-                title="Copy invite link"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
+                <span className="flex items-center gap-2">
+                    <span className="flex items-center">
+                        <span>Team:</span>
+                        <span className="font-medium ml-1">{teamName.toUpperCase()}</span>
+                    </span>
+                    <span className="text-muted-foreground mx-2">/</span>
+                    <span className="flex items-center">
+                        <span className="font-medium">{userName?.toUpperCase()}</span>
+                    </span>
+                </span>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={copyInviteLink}
+                    className="h-8 w-8"
+                    title="Copy invite link"
+                >
+                    <Copy className="h-4 w-4" />
+                </Button>
             </div>
           )}
           <CardTitle className="text-2xl font-bold">
             {gameState.currentStory || "No active task"}
           </CardTitle>
-          {/* Task input alanı eklendi */}
+          {
+            isScrumMaster && (
           <div className="flex gap-2 mt-4">
             <Input
               value={taskInput}
@@ -139,7 +146,8 @@ export default function GameScreen() {
               placeholder="Enter task description"
             />
             <Button onClick={startNewTask}>Start New Task</Button>
-          </div>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -180,6 +188,8 @@ export default function GameScreen() {
             </div>
           </div>
         </CardContent>
+        {
+          isScrumMaster && (
         <CardFooter className="flex justify-between">
           <Button onClick={toggleShowVotes} className="flex items-center">
             {gameState.showVotes ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
@@ -189,6 +199,7 @@ export default function GameScreen() {
             Reset Votes
           </Button>
         </CardFooter>
+        )}
       </Card>
     </div>
   )
