@@ -28,10 +28,12 @@ export default function CreateGame() {
       teamName,
       isScrumMaster: true
     })
+    // set session storage isScrumMaster
+    sessionStorage.setItem("isScrumMaster", "true")
 
 
     socket.on("roomUpdate", () => {
-      router.push(`/plan/${roomId}?teamName=${teamName}`)
+      router.push(`/plan/${roomId}?teamName=${teamName}&userName=${scrumMasterName}`)
     })
   }
 

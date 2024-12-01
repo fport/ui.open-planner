@@ -18,15 +18,7 @@ export default function JoinMember({ id }: { id: string }) {
     e.preventDefault()
     if (!userName.trim()) return
 
-    const newSocket = io(process.env.NEXT_PUBLIC_API_URL)
-    
-    newSocket.emit("joinRoom", { 
-      roomId: id,
-      userName: userName,
-      isScrumMaster: false 
-    })
-
-    router.push(`/plan/${id}?teamName=${teamName}`)
+    router.push(`/plan/${id}?teamName=${teamName}&userName=${userName}`)
   }
 
   return (
