@@ -6,35 +6,70 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
-import { io } from "socket.io-client"
+import { useState, useEffect } from "react"
 import { v4 as uuidv4 } from "uuid"
+import { useRoom } from "@/hooks/useRoom"
+import { useToast } from "@/hooks/use-toast"
 
 export default function CreateGame() {
   const router = useRouter()
+  const { toast } = useToast()
   const [teamName, setTeamName] = useState("")
   const [scrumMasterName, setScrumMasterName] = useState("")
   const [votingSystem, setVotingSystem] = useState("fibonacci")
+  const roomId = uuidv4()
+  const { createRoom, room, error, isConnected, isConnecting } = useRoom(roomId)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (room) {
+      console.log('Room created, redirecting to:', `/plan/${roomId}?teamName=${teamName}&userName=${scrumMasterName}`);
+      sessionStorage.setItem("isScrumMaster", "true")
+      sessionStorage.setItem("roomId", roomId)
+      sessionStorage.setItem("userName", scrumMasterName)
+      router.push(`/plan/${roomId}?teamName=${teamName}&userName=${scrumMasterName}`)
+    }
+  }, [room, router, roomId, teamName, scrumMasterName])
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error)
+    }
+  }, [error])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    const socket = io(process.env.NEXT_PUBLIC_API_URL)
-    const roomId = uuidv4()
+    if (isConnecting) {
+      toast.error("Still connecting to server, please wait...")
+      return
+    }
 
-    socket.emit("createRoom", {
-      roomId,
-      userName: scrumMasterName,
-      teamName,
-      isScrumMaster: true
-    })
-    // set session storage isScrumMaster
-    sessionStorage.setItem("isScrumMaster", "true")
+    if (!isConnected) {
+      toast.error("Not connected to server. Please try again.")
+      return
+    }
 
+    if (!teamName || !scrumMasterName) {
+      toast.error("Please fill in all required fields")
+      return
+    }
 
-    socket.on("roomUpdate", () => {
-      router.push(`/plan/${roomId}?teamName=${teamName}&userName=${scrumMasterName}`)
-    })
+    try {
+      console.log('Creating room with data:', {
+        userName: scrumMasterName,
+        teamName,
+        isScrumMaster: true
+      });
+
+      createRoom({
+        userName: scrumMasterName,
+        teamName,
+        isScrumMaster: true
+      })
+    } catch (err) {
+      console.error('Error creating room:', err);
+      toast.error("Failed to create room. Please try again.")
+    }
   }
 
   return (
@@ -47,13 +82,14 @@ export default function CreateGame() {
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="sessionName">Team Name</Label>
+                <Label htmlFor="teamName">Team Name</Label>
                 <Input
                   id="teamName"
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
                   placeholder="Enter team name"
                   required
+                  disabled={isConnecting}
                 />
               </div>
               <div>
@@ -62,8 +98,9 @@ export default function CreateGame() {
                   id="scrumMasterName"
                   value={scrumMasterName}
                   onChange={(e) => setScrumMasterName(e.target.value)}
-                  placeholder="Enter team name"
+                  placeholder="Enter your name"
                   required
+                  disabled={isConnecting}
                 />
               </div>
               <div>
@@ -72,6 +109,7 @@ export default function CreateGame() {
                   value={votingSystem}
                   onValueChange={setVotingSystem}
                   className="flex flex-col space-y-1 mt-2"
+                  disabled={isConnecting}
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="fibonacci" id="fibonacci" />
@@ -87,10 +125,15 @@ export default function CreateGame() {
           </form>
         </CardContent>
         <CardFooter>
-          <Button className="w-full" onClick={handleSubmit}>Create Game</Button>
+          <Button 
+            className="w-full" 
+            onClick={handleSubmit}
+            disabled={!isConnected || !teamName || !scrumMasterName || isConnecting}
+          >
+            {isConnecting ? "Connecting..." : !isConnected ? "Not Connected" : "Create Game"}
+          </Button>
         </CardFooter>
       </Card>
     </div>
   )
-}
-
+} 
