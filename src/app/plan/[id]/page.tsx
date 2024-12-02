@@ -10,13 +10,17 @@ import { Copy, Eye, EyeOff } from 'lucide-react'
 import { useParams, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useRoom } from "@/hooks/useRoom"
-import { Room, User } from "@/types/room"
+import { User } from "@/types/room"
+
+interface ExtendedUser extends User {
+  avatar: string;
+}
 
 interface GameState {
-  currentStory: string
-  participants: User[]
-  showVotes: boolean
-  teamName?: string
+  currentStory: string;
+  participants: ExtendedUser[];
+  showVotes: boolean;
+  teamName?: string;
 }
 
 export default function GameScreen() {

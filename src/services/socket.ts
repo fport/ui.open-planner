@@ -16,6 +16,7 @@ export class SocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private eventHandlers: Map<string, Function[]> = new Map();
+  private isConnecting = false;
 
   private constructor() {}
 
@@ -31,25 +32,36 @@ export class SocketService {
       return this.socket;
     }
 
-    if (this.socket) {
-      this.socket.close();
-      this.socket.removeAllListeners();
+    if (this.isConnecting) {
+      return this.socket!;
     }
 
-    console.log('Connecting to socket server:', url);
-    
-    this.socket = io(url, {
-      transports: ['websocket', 'polling'],
-      autoConnect: true,
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: this.maxReconnectAttempts,
-      timeout: parseInt(process.env.NEXT_PUBLIC_SOCKET_TIMEOUT || '120000'),
-      forceNew: false
-    });
+    this.isConnecting = true;
 
-    this.setupDefaultHandlers();
+    try {
+      if (this.socket) {
+        this.socket.removeAllListeners();
+        this.socket.close();
+      }
+
+      console.log('Connecting to socket server:', url);
+      
+      this.socket = io(url, {
+        transports: ['websocket', 'polling'],
+        autoConnect: true,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: this.maxReconnectAttempts,
+        timeout: parseInt(process.env.NEXT_PUBLIC_SOCKET_TIMEOUT || '120000'),
+        forceNew: false
+      });
+
+      this.setupDefaultHandlers();
+    } finally {
+      this.isConnecting = false;
+    }
+
     return this.socket;
   }
 
@@ -59,12 +71,17 @@ export class SocketService {
     this.socket.on('connect', () => {
       console.log('Connected to socket server with ID:', this.socket?.id);
       this.reconnectAttempts = 0;
+      this.reattachEventHandlers();
     });
 
     this.socket.on('disconnect', (reason) => {
       console.log('Disconnected from socket server:', reason);
       if (reason === 'io server disconnect') {
-        setTimeout(() => this.socket?.connect(), 1000);
+        setTimeout(() => {
+          if (this.socket && !this.socket.connected) {
+            this.socket.connect();
+          }
+        }, 1000);
       }
     });
 
@@ -80,6 +97,16 @@ export class SocketService {
 
     this.socket.on('error', (error: any) => {
       console.error('Socket error:', error);
+    });
+  }
+
+  private reattachEventHandlers() {
+    if (!this.socket) return;
+
+    this.eventHandlers.forEach((handlers, event) => {
+      handlers.forEach(handler => {
+        this.socket?.on(event, handler);
+      });
     });
   }
 
@@ -134,25 +161,61 @@ export class SocketService {
   public onRoomCreated(callback: (room: Room) => void): () => void {
     this.socket?.on(RoomEventType.ROOM_CREATED, callback);
     this.addEventHandler(RoomEventType.ROOM_CREATED, callback);
-    return () => this.socket?.off(RoomEventType.ROOM_CREATED, callback);
+    return () => {
+      this.socket?.off(RoomEventType.ROOM_CREATED, callback);
+      const handlers = this.eventHandlers.get(RoomEventType.ROOM_CREATED);
+      if (handlers) {
+        this.eventHandlers.set(
+          RoomEventType.ROOM_CREATED,
+          handlers.filter(h => h !== callback)
+        );
+      }
+    };
   }
 
   public onRoomUpdated(callback: (room: Room) => void): () => void {
     this.socket?.on(RoomEventType.ROOM_UPDATED, callback);
     this.addEventHandler(RoomEventType.ROOM_UPDATED, callback);
-    return () => this.socket?.off(RoomEventType.ROOM_UPDATED, callback);
+    return () => {
+      this.socket?.off(RoomEventType.ROOM_UPDATED, callback);
+      const handlers = this.eventHandlers.get(RoomEventType.ROOM_UPDATED);
+      if (handlers) {
+        this.eventHandlers.set(
+          RoomEventType.ROOM_UPDATED,
+          handlers.filter(h => h !== callback)
+        );
+      }
+    };
   }
 
   public onNewTaskStarted(callback: (data: { taskName: string }) => void): () => void {
     this.socket?.on(RoomEventType.NEW_TASK_STARTED, callback);
     this.addEventHandler(RoomEventType.NEW_TASK_STARTED, callback);
-    return () => this.socket?.off(RoomEventType.NEW_TASK_STARTED, callback);
+    return () => {
+      this.socket?.off(RoomEventType.NEW_TASK_STARTED, callback);
+      const handlers = this.eventHandlers.get(RoomEventType.NEW_TASK_STARTED);
+      if (handlers) {
+        this.eventHandlers.set(
+          RoomEventType.NEW_TASK_STARTED,
+          handlers.filter(h => h !== callback)
+        );
+      }
+    };
   }
 
   public onError(callback: (error: RoomError) => void): () => void {
     this.socket?.on(RoomEventType.ERROR, callback);
     this.addEventHandler(RoomEventType.ERROR, callback);
-    return () => this.socket?.off(RoomEventType.ERROR, callback);
+    return () => {
+      this.socket?.off(RoomEventType.ERROR, callback);
+      const handlers = this.eventHandlers.get(RoomEventType.ERROR);
+      if (handlers) {
+        this.eventHandlers.set(
+          RoomEventType.ERROR,
+          handlers.filter(h => h !== callback)
+        );
+      }
+    };
   }
 
   public disconnect(): void {

@@ -11,42 +11,51 @@ export const useRoom = (roomId: string) => {
 
   useEffect(() => {
     let mounted = true;
-    let cleanupFns: Array<() => void> = [];
+    const cleanupFns: Array<() => void> = [];
 
     const connect = () => {
       try {
         setIsConnecting(true);
         const socket = socketService.connect();
 
-        socket.on('connect', () => {
+        const onConnect = () => {
           if (mounted) {
             console.log('Connected with socket ID:', socket.id);
             setIsConnected(true);
             setIsConnecting(false);
             setError(null);
           }
-        });
+        };
 
-        socket.on('disconnect', () => {
+        const onDisconnect = () => {
           if (mounted) {
             console.log('Disconnected from server');
             setIsConnected(false);
             setError('Disconnected from server. Attempting to reconnect...');
           }
-        });
+        };
 
-        socket.on('connect_error', () => {
+        const onConnectError = () => {
           if (mounted) {
             console.log('Connection error');
             setIsConnected(false);
             setError('Failed to connect to server. Retrying...');
           }
+        };
+
+        socket.on('connect', onConnect);
+        socket.on('disconnect', onDisconnect);
+        socket.on('connect_error', onConnectError);
+
+        cleanupFns.push(() => {
+          socket.off('connect', onConnect);
+          socket.off('disconnect', onDisconnect);
+          socket.off('connect_error', onConnectError);
         });
 
-        // Add cleanup functions for event handlers
         cleanupFns.push(
           socketService.onRoomCreated((updatedRoom: Room) => {
-            if (mounted) {
+            if (mounted && updatedRoom.id === roomId) {
               console.log('Room created:', updatedRoom);
               setRoom(updatedRoom);
               setError(null);
@@ -56,7 +65,7 @@ export const useRoom = (roomId: string) => {
 
         cleanupFns.push(
           socketService.onRoomUpdated((updatedRoom: Room) => {
-            if (mounted) {
+            if (mounted && updatedRoom.id === roomId) {
               console.log('Room updated:', updatedRoom);
               setRoom(updatedRoom);
               setError(null);
@@ -75,6 +84,10 @@ export const useRoom = (roomId: string) => {
             }
           })
         );
+
+        if (socket.connected) {
+          onConnect();
+        }
       } catch (err) {
         if (mounted) {
           console.error('Socket initialization error:', err);
@@ -89,9 +102,8 @@ export const useRoom = (roomId: string) => {
     return () => {
       mounted = false;
       cleanupFns.forEach(cleanup => cleanup());
-      socketService.disconnect();
     };
-  }, []);
+  }, [roomId]);
 
   const createRoom = useCallback((data: Omit<CreateRoomData, 'roomId'>) => {
     setError(null);
