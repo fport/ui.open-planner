@@ -5,11 +5,13 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
-import { v4 as uuidv4 } from "uuid"
-import { useRoom } from "@/hooks/useRoom"
 import { useToast } from "@/hooks/use-toast"
+import { useRoom } from "@/hooks/useRoom"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { v4 as uuidv4 } from "uuid"
+
+const roomId = uuidv4()
 
 export default function CreateGame() {
   const router = useRouter()
@@ -17,7 +19,6 @@ export default function CreateGame() {
   const [teamName, setTeamName] = useState("")
   const [scrumMasterName, setScrumMasterName] = useState("")
   const [votingSystem, setVotingSystem] = useState("fibonacci")
-  const roomId = uuidv4()
   const { createRoom, room, error, isConnected, isConnecting } = useRoom(roomId)
 
   useEffect(() => {
